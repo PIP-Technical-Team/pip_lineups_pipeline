@@ -46,7 +46,52 @@ read_aux_list <- function(path) {
 }
 
 
-
+#' Get full list of countries and years for lineup estimation
+#' 
+#' The reason this approach is used, is to identify specific countries
+#' like SSD where there isn't data for all years in [lineup_years]
+#'
+#' @param lineup_years 
+#'
+#' @return
+#' @export
+get_full_list <- function(lineup_years, 
+                          only_country = NULL) {
+  
+  ctry <- pipr::get_stats(fill_gaps = T)
+  ctry <-
+    ctry |>
+    fsubset(year <= max(lineup_years)) |> 
+    fselect(country_code,
+            year) |>
+    funique() |>
+    qDT()
+  
+  # Group and create the list
+  full_list <- ctry[,
+                    .(year = list(sort(unique(year)))),
+                    by = country_code][,
+                                       lapply(.SD,
+                                              as.list),
+                                       .SDcols = c("country_code", "year")]
+  
+  
+  # Convert rows into list of named lists
+  full_list <- lapply(1:nrow(full_list),
+                      \(i) {
+                        list(
+                          country_code = full_list$country_code[[i]],
+                          year         = full_list$year[[i]])})
+  
+  if (!is.null(only_country)) {
+    cn <- which(unlist(full_list |>
+                         lapply(\(x){return(x$country_code)})) == only_country)
+    full_list <- full_list[cn]
+  }
+  
+  full_list
+  
+}
 
 
 
@@ -77,6 +122,16 @@ relative_distance <- \(ref_year, svy_year) {
 }
 
 
+#' Prep refy table to be used in the api
+#' 
+#' This function checks for uniqueness among needed columns by country-year, 
+#' and makes those that are not unique NA. Then, it selects only the necessary columns
+#' and makes the df unique by country-year
+#'
+#' @param df_refy 
+#'
+#' @return data frame
+#' @export
 prep_df_refy_for_lineups <- function(df_refy) {
   
   # variables to check for duplicates
@@ -94,7 +149,18 @@ prep_df_refy_for_lineups <- function(df_refy) {
             "income_group_code",
             "lineup_approach",
             "wb_region_code",
-            "is_interpolated")
+            "is_interpolated", 
+            "reporting_pop", 
+            "reporting_gdp", 
+            "reporting_pce", 
+            "pop_data_level", 
+            "pce_data_level",
+            "gdp_data_level", 
+            "cpi_data_level", 
+            "ppp_data_level", 
+            "is_used_for_line_up", 
+            "is_used_for_aggregation",
+            "cache_id")
   
   # Define grouping variables
   group_vars <- c("country_code", 
