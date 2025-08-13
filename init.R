@@ -134,33 +134,7 @@ relative_distance <- \(ref_year, svy_year) {
 #' @export
 prep_df_refy_for_lineups <- function(df_refy) {
   
-  # variables to check for duplicates
-  vars <- c("survey_acronym", 
-            "survey_coverage",
-            "comparable_spell",
-            "ppp",
-            "cpi",
-            "distribution_type",
-            "estimation_type", 
-            "country_code", 
-            "reporting_year", 
-            "reporting_level", 
-            "welfare_type", 
-            "income_group_code",
-            "lineup_approach",
-            "wb_region_code",
-            "is_interpolated", 
-            "reporting_pop", 
-            "reporting_gdp", 
-            "reporting_pce", 
-            "pop_data_level", 
-            "pce_data_level",
-            "gdp_data_level", 
-            "cpi_data_level", 
-            "ppp_data_level", 
-            "is_used_for_line_up", 
-            "is_used_for_aggregation",
-            "cache_id")
+  vars <- colnames(df_refy)
   
   # Define grouping variables
   group_vars <- c("country_code", 
@@ -170,18 +144,65 @@ prep_df_refy_for_lineups <- function(df_refy) {
   
   # Columns to check for uniqueness (exclude the grouping vars)
   check_vars <- setdiff(vars, group_vars)
+  df_refy$survey_comparability <- NA
+  df_refy$comparable_spell     <- NA
+  df_refy$survey_mean_lcu      <- NA
+  df_refy$survey_mean_ppp      <- NA
+  df_refy$survey_median_lcu    <- NA
+  df_refy$survey_median_ppp    <- NA
+
+  # Change to character
+  #---------------------------------------------------------------
+  # per-group count of distinct (non-NA) values for each check_var
+  nu_counts <- df_refy[, 
+                       lapply(.SD, uniqueN, na.rm = TRUE),
+                       by      = group_vars,
+                       .SDcols = check_vars]
   
-  df_refy[, 
-          (check_vars) := lapply(.SD, function(col) {
-            # For each group, if column is not unique, set NA
-            if (length(unique(col)) == 1L) {
-              col
-              } else {
-                rep(NA, .N)
-                }
-            }), 
-          by            = group_vars, 
-          .SDcols       = check_vars]
+  # columns that are "non-unique of length 1" in at least one group (i.e., >1 distinct value)
+  cols_to_char <- check_vars[sapply(nu_counts[, 
+                                              ..check_vars], 
+                                    function(v) any(v > 1L))]
+  
+  # turn those entire columns into character
+  if (length(cols_to_char)) {
+    df_refy[, 
+            (cols_to_char) := lapply(.SD, 
+                                     as.character), 
+            .SDcols         = cols_to_char]
+  }  
+  
+  # Add // where necessary for interpolations
+  #---------------------------------------------------------------
+  # only apply the '//' logic to columns that sometimes need slashes
+  cols_slashed <- setdiff(cols_to_char, "estimation_type")
+  
+  if (length(cols_slashed) > 0L) {
+    df_refy[
+      ,
+      (cols_slashed) := {
+        # computed once per group; visible inside lapply
+        has_interp <- any(estimation_type == "interpolation", na.rm = TRUE)
+        
+        lapply(.SD, function(col) {
+          vals <- unique(na.omit(col))  # distinct non-NA in first-seen order
+          
+          if (length(vals) > 1L) {
+            # normal collapse: x//y//...
+            rep(paste(vals, collapse = "//"), .N)
+          } else if (has_interp && length(vals) == 1L) {
+            # force interpolation format even when identical: x//x
+            rep(paste(vals[1L], vals[1L], sep = "//"), .N)
+          } else {
+            # leave as-is (including all-NA)
+            col
+          }
+        })
+      },
+      by = group_vars,
+      .SDcols = cols_slashed
+    ]
+  } 
   
   df_refy |> 
     fselect(vars) |> 
