@@ -19,7 +19,7 @@ df_refy <- fst::read.fst(path = fs::path(version_path,
                                          "estimations",
                                          "prod_ref_estimation.fst")) |> 
   get_refy_mult_factor()
-df_refy |> fsubset(country_code == "CHN")
+
 gls <- pipfun::pip_create_globals(vintage = version)
 
 # Get all .qs files
@@ -31,33 +31,35 @@ max_lineup_year <-
   reg_elem() # use this lineup year
 
 
-lineup_years <- 1981:max_lineup_year
+lineup_years <- 1981:2025
 
 full_list <-
   get_full_list(lineup_years = lineup_years, 
                 df_refy      = df_refy)
-is_tjk <-
-  which(unlist(full_list |>
-               lapply(\(x){return(x$country_code)})) == "TJK")
-full_list[[is_tjk]]$year <- 1981:2023
-is_ind <-
-  which(unlist(full_list |>
-                 lapply(\(x){return(x$country_code)})) == "IND")
+# is_tjk <-
+#   which(unlist(full_list |>
+#                lapply(\(x){return(x$country_code)})) == "TJK")
+# full_list[[is_tjk]]$year <- 1981:2023
+# is_ind <-
+#   which(unlist(full_list |>
+#                  lapply(\(x){return(x$country_code)})) == "IND")
 # execute load functions
 #-------------------------------------------
+# tjk_list <- full_list[[is_tjk]]
+# tjk_list$year <- 2025
 t1 <- Sys.time()
 write_multiple_refy_dist(df_refy     = df_refy,
-                                   cntry_refy  = full_list[is_ind+1:length(full_list)], 
-                                   path        = fs::path(version_path, 
-                                                          "lineup_data"),
-                                   gls         = gls,
-                                   dl_aux      = dl_aux)
+                         cntry_refy  = full_list, #[is_tjk+1:length(full_list)],#list(tjk_list), #full_list[is_tjk], #, 
+                         path        = fs::path(version_path,
+                                                "lineup_data"),
+                         gls         = gls,
+                         dl_aux      = dl_aux)
 t2 <- Sys.time()
 print(t2 - t1)
 # Create dist stats data table
 #-------------------------------------------
 full_dt_dist_stats <- 
-  load_full_dt_dist_stats(full_list[-is_ind], 
+  load_full_dt_dist_stats(full_list, 
                           path = fs::path(version_path, 
                                           "lineup_data"))
 
@@ -91,7 +93,7 @@ df_refy <- fst::read.fst(path = fs::path(version_path,
   get_refy_mult_factor()
 t1c <- Sys.time()
 df_all <- get_full_lineup_distribution(df_refy     = df_refy,
-                                       full_list   = full_list, 
+                                       full_list   = full_list[-is_tjk], 
                                        gls         = gls,
                                        dl_aux      = dl_aux)
 

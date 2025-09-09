@@ -144,7 +144,6 @@ get_full_list <- function(lineup_years,
     fsubset(reporting_year <= max(lineup_years)) |> 
     fselect(country_code,
             year = reporting_year) |>
-    fmutate(country_code = fifelse(country_code == "ARE", "ARG", country_code)) |> 
     funique() |>
     qDT()
   

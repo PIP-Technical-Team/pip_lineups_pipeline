@@ -29,47 +29,15 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
     fselect("country_code",
             "reporting_level",
             "welfare_type",
-            #"income_group_code",
             "survey_year",
             "reporting_year",
-            #"nac",
-            #"nac_sy",
             "relative_distance",
-            #"estimation_type",
-            #"lineup_case",
-            #"interpolation_id",
-            #"predicted_mean_ppp",
-            #"reporting_gdp",
-            #"reporting_pce",
             "reporting_pop",
-            #"monotonic",
-            #"same_direction",
-            #"svy_mean",
             "survey_id",
             "cache_id",
-            #"wb_region_code",
-            #"pcn_region_code",
             "survey_acronym",
-            #"survey_coverage",
-            #"survey_comparability",
-            #"comparable_spell",
-            #"surveyid_year",
-            #"survey_time",
-            #"survey_mean_lcu",
-            #"survey_mean_ppp",
-            #"ppp",
-            #"cpi",
-            #"pop_data_level",
-            #"gdp_data_level",
-            #"pce_data_level",
-            #"cpi_data_level",
-            #"ppp_data_level",
             "distribution_type",
-            #"gd_type",
             "is_interpolated",
-            #"is_used_for_line_up",
-            #"is_used_for_aggregation",
-            #"display_cp",
             "lineup_approach",
             "mult_factor")
 
@@ -77,22 +45,12 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
   # reduce df_refy
   df_refy <-
     df_refy |>
-    vars_to_attr(vars = c(#"country_code",
-      #"reporting_level",
-      #"welfare_type",
-      #"income_group_code",
-      #"survey_year",
-      #"reporting_year",
+    vars_to_attr(vars = c(
       "survey_id",
-      #"cache_id",
-      #"wb_region_code",
-      #"pcn_region_code",
       "survey_acronym",
       "distribution_type",
       "is_interpolated",
-      "lineup_approach"#,
-      #"mult_factor"
-    ))
+      "lineup_approach"))
   
 
 
@@ -101,7 +59,6 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
     funique()
   gv(df_refy,
      "cache_id") <- NULL
-  survey_year_rows <- list()
   df_svy <- collapse::rowbind(lapply(as.list(cache_id),
                                      FUN = function(x){
                                        pipload::pip_load_cache(cache_id = x,
@@ -164,41 +121,8 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
     welfare := bc
   ]
 
-  if (any(diff(df$survey_year) < 0) &
-      !any(diff(df_svy$survey_year) < 0)) {
-    data.table::setorder(df,
-                         survey_year)
-  }
-
   # temp
   setkey(df, NULL)
-
-  # Make survey year rows an attribute
-  survey_year_rows <- df_svy |>
-    fselect(survey_year) |>
-    fmutate(rows = 1:fnrow(df_svy)) |>
-    fgroup_by(survey_year) |>
-    fsummarise(rows = fmax(rows))
-
-  survey_year_rows <-
-    list(survey_year  = survey_year_rows$survey_year,
-         rows         = survey_year_rows$rows)
-
-  # Make reporting level rows an attribute
-  reporting_level_rows <- df_svy |>
-    fselect(reporting_level, survey_year) |>
-    fmutate(rows = 1:fnrow(df_svy),
-            rl   = paste0(reporting_level,
-                          survey_year)) |>
-    fgroup_by(rl) |>
-    fmutate(rows = fmax(rows)) |>
-    fungroup() |>
-    fselect(reporting_level, rows) |>
-    funique()
-
-  reporting_level_rows <-
-    list(reporting_level = as.character(reporting_level_rows$reporting_level),
-         rows            = reporting_level_rows$rows)
 
   # Add dist stats to attributes
   dist_stats <- get_dist_stats(df = df)
@@ -206,12 +130,7 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
        "dist_stats") <- dist_stats$dist_stats
   attr(df,
        "dt_dist_stats") <- dist_stats$dt_dist
-
-  # Make welfare type an attribute
-  df <-
-    df |>
-    vars_to_attr(vars = c("welfare_type"))
-
+  
   # keep attributes of df_refy
   attributes(df) <- c(attributes(df),
                       attributes(df_refy)[-which(names(attributes(df_refy)) %in%
@@ -225,15 +144,12 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
 
   # Add columns to attributes
   df <- vars_to_attr(df, "n_imp")
-  attr(df,
-       "survey_year_rows")    <- survey_year_rows
   df <- df |>
     vars_to_attr(var = c("country_code",
                          "survey_acronym",
                          "survey_year",
-                         "reporting_year"))
-  attr(df,
-       "reporting_level_rows") <- reporting_level_rows
+                         "reporting_year", 
+                         "welfare_type"))
 
   # rm cols
   gv(df,
@@ -243,166 +159,58 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
        "surveyid_year",
        "mult_factor",
        "welfare_ppp",
-       "reporting_level")) <- NULL
+       "imputation_id")) <- NULL
 
   df
 
 }
 
 
-#
-# load_surveys_for_refy_dist <- function(dir, id) {
-#
-#   dt <- fst::read_fst(path          = fs::path(dir,
-#                                                "survey_data",
-#                                                id,
-#                                                ext = "fst"),
-#                       as.data.table = TRUE)
-#
-#   dt
-#
-# }
+
+
+get_refy_quantiles <- function(df, nobs = 2e4) {
+  
+  setorder(df, 
+           reporting_level, 
+           welfare)
+  
+  df_attr <- attributes(df)
+  
+  # get reporting levels
+  rls <- df[, reporting_level] |> 
+    funique()
+  probs <- seq(1, nobs, 1)/nobs - 5/(nobs*10)
+  
+  qx <- lapply(rls, \(rl) {
+    x    <- df[reporting_level == rl]
+    xpop <- fsum(df$weight)
+    
+    Qx <- fquantile(x$welfare, 
+                    w     = x$weight, 
+                    probs =  probs, 
+                    names = FALSE)
+    
+    data.table(welfare         = Qx, 
+               weight          = xpop/nobs, 
+               reporting_level = rl) |> 
+      fselect(df_attr$names)
+  }) |> 
+    rowbind()
+  
+  # Add attr back
+  attributes(qx) <- df_attr
+  
+  qx
+}
 
 
 
-#
-#
-#
-#
-# get_dist_stats <- function(df) {
-#
-#   # min
-#   min <- fmin(df$welfare,
-#               g = df$reporting_level) |>
-#     as.list()
-#
-#   # max
-#   max <- fmax(df$welfare,
-#               g = df$reporting_level) |>
-#     as.list()
-#
-#   # mean
-#   mean <- fmean(x = df$welfare,
-#                 w = df$weight,
-#                 g = df$reporting_level) |>
-#     as.list()
-#
-#   # median
-#   median <- fmedian(x = df$welfare,
-#                     w = df$weight,
-#                     g = df$reporting_level) |>
-#     as.list()
-#
-#   # gini
-#   gini <- sapply(df$reporting_level |> funique(),
-#                  FUN = \(x) {
-#                    wbpip::md_compute_gini(welfare = df$welfare[df$reporting_level == x],
-#                                           weight  = df$weight[df$reporting_level == x])
-#                  }) |>
-#     as.list()
-#
-#   # mld
-#   mld <- sapply(df$reporting_level |> funique(),
-#                 FUN = \(x) {
-#                   wbpip::md_compute_mld(welfare = df$welfare[df$reporting_level == x],
-#                                         weight  = df$weight[df$reporting_level == x],
-#                                         mean    = mean$x)
-#                 }) |>
-#     as.list()
-#
-#   # polarization
-#   pol <- sapply(df$reporting_level |> funique(),
-#                 FUN = \(x) {
-#                   wbpip::md_compute_polarization(welfare = df$welfare[df$reporting_level == x],
-#                                                  weight  = df$weight[df$reporting_level == x],
-#                                                  gini    = gini[[x]],
-#                                                  mean    = mean[[x]],
-#                                                  median  = median[[x]])
-#                 }) |>
-#     as.list()
-#
-#   # results
-#   dist_stats <- list(min          = min,
-#                      max          = max,
-#                      mean         = mean,
-#                      median       = median,
-#                      gini         = gini,
-#                      mld          = mld,
-#                      polarization = pol)
-#   dist_stats
-#
-#   # data.table
-#   # rplev <- funique(df$reporting_level)
-#   # cc    <- funique(df$country_code)
-#   # ry    <- funique(df$reporting_year)
-#   # dt_dist <- data.table(country_code    = cc,
-#   #                       reporting_year  = ry,
-#   #                       reporting_level = rplev)
-#   # print(dt_dist)
-#   # print(dist_stats$polarization |>
-#   #         qDT())# |>
-#   #         #pivot()) #|>
-#   #         # fmutate(reporting_level = as.character(variable),
-#   #         #         polarization    = value) |>
-#   #         # fselect(reporting_level,
-#   #         #         polarization))
-#   # dt_dist <- joyn::left_join(dt_dist,
-#   #                            dist_stats$polarization |>
-#   #                              qDT() |>
-#   #                              pivot() |>
-#   #                              fmutate(reporting_level = as.character(variable),
-#   #                                      polarization    = value) |>
-#   #                              fselect(reporting_level,
-#   #                                      polarization),
-#   #                            by           = c("reporting_level"),
-#   #                            relationship = "one-to-one",
-#   #                            reportvar    = F) |>
-#   #   joyn::left_join(dist_stats$mean |>
-#   #                     qDT() |>
-#   #                     pivot() |>
-#   #                     fmutate(reporting_level = as.character(variable),
-#   #                                      mean    = value) |>
-#   #                     fselect(reporting_level,
-#   #                             mean),
-#   #                   by           = c("reporting_level"),
-#   #                   relationship = "one-to-one",
-#   #                   reportvar    = F) |>
-#   #   joyn::left_join(dist_stats$median |>
-#   #                              qDT() |>
-#   #                              pivot() |>
-#   #                              fmutate(reporting_level = as.character(variable),
-#   #                                      median    = value) |>
-#   #                              fselect(reporting_level,
-#   #                                      median),
-#   #                    by           = c("reporting_level"),
-#   #                    relationship = "one-to-one",
-#   #                    reportvar    = F) |>
-#   #   joyn::left_join( dist_stats$gini |>
-#   #                              qDT() |>
-#   #                              pivot() |>
-#   #                              fmutate(reporting_level = as.character(variable),
-#   #                                      gini    = value) |>
-#   #                              fselect(reporting_level,
-#   #                                      gini),
-#   #                    by           = c("reporting_level"),
-#   #                    relationship = "one-to-one",
-#   #                    reportvar    = F) |>
-#   #   joyn::left_join(dist_stats$mld |>
-#   #                              qDT() |>
-#   #                              pivot() |>
-#   #                              fmutate(reporting_level = as.character(variable),
-#   #                                      mld    = value) |>
-#   #                              fselect(reporting_level,
-#   #                                      mld),
-#   #                   by           = c("reporting_level"),
-#   #                   relationship = "one-to-one",
-#   #                   reportvar    = F)
-#   #
-#   #
-#   # list(dist_stats,
-#   #      dt_dist)
-#
-# }
+
+
+
+
+
+
 
 
 #' Distribution statistics of lineup distribution

@@ -77,7 +77,8 @@ write_multiple_refy_dist <-
                                                               cntry_code = country_code,
                                                               ref_year   = year,
                                                               gls        = gls, 
-                                                              py        = py) |>
+                                                              py         = py) |>
+                                         get_refy_quantiles(nobs = 2e4) |> 
                                          add_aux_data_attr(dl_aux          = dl_aux,
                                                            df_refy         = df_refy,
                                                            py              = py) |>
