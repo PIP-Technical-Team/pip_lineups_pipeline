@@ -9,6 +9,9 @@ ppp <- strsplit(version, "_")[[1]][2] |>
   as.numeric()
 version_path  <- fs::path("E:/PIP/pipapi_data/", 
                           version)
+use_csum_fst      <- TRUE
+update_dist_stats <- TRUE
+
 
 # load key objects
 source(fs::path("init.R")) # git creds to run create globals function=
@@ -36,32 +39,70 @@ lineup_years <- 1981:2025
 full_list <-
   get_full_list(lineup_years = lineup_years, 
                 df_refy      = df_refy)
-# is_tjk <-
-#   which(unlist(full_list |>
-#                lapply(\(x){return(x$country_code)})) == "TJK")
-# full_list[[is_tjk]]$year <- 1981:2023
-# is_ind <-
-#   which(unlist(full_list |>
-#                  lapply(\(x){return(x$country_code)})) == "IND")
+
 # execute load functions
 #-------------------------------------------
-# tjk_list <- full_list[[is_tjk]]
-# tjk_list$year <- 2025
-t1 <- Sys.time()
-write_multiple_refy_dist(df_refy     = df_refy,
-                         cntry_refy  = full_list, #[is_tjk+1:length(full_list)],#list(tjk_list), #full_list[is_tjk], #, 
-                         path        = fs::path(version_path,
-                                                "lineup_data"),
-                         gls         = gls,
-                         dl_aux      = dl_aux)
-t2 <- Sys.time()
-print(t2 - t1)
-# Create dist stats data table
-#-------------------------------------------
-full_dt_dist_stats <- 
-  load_full_dt_dist_stats(full_list, 
-                          path = fs::path(version_path, 
-                                          "lineup_data"))
+if (isFALSE(use_csum_fst)) {
+  t1 <- Sys.time()
+  write_multiple_refy_dist(df_refy     = df_refy,
+                           cntry_refy  = full_list, 
+                           path        = fs::path(version_path,
+                                                  "lineup_data"),
+                           gls         = gls,
+                           dl_aux      = dl_aux)
+  t2 <- Sys.time()
+  print(t2 - t1)
+  # Create dist stats data table
+  #-------------------------------------------
+  full_dt_dist_stats <- 
+    load_full_dt_dist_stats(full_list, 
+                            path = fs::path(version_path, 
+                                            "lineup_data"))
+  fst::write.fst(full_dt_dist_stats,
+                 path = fs::path(version_path,
+                                 "estimations/lineup_dist_stats.fst"))
+}
+
+if (use_csum_fst) {
+  
+  env_acc_dist_stats <- new.env(parent = .GlobalEnv)
+  write_csum_refy(df_refy     = df_refy,
+                  cntry_refy  = full_list, 
+                  path        = fs::path(version_path,
+                                         "lineup_data"),
+                  gls         = gls,
+                  dl_aux      = dl_aux, 
+                  env_acc = env_acc_dist_stats)
+  print("write csum fst done")
+  
+  if (update_dist_stats) {
+    all_dist_stats <- data.table::rbindlist(as.list(env_acc_dist_stats), 
+                                            use.names = TRUE, 
+                                            fill      = TRUE)
+    setorder(all_dist_stats, 
+             country_code, 
+             reporting_year)
+    fst::write.fst(all_dist_stats,
+                   path = fs::path(version_path,
+                                   "estimations/LD_dist_stats.fst"))
+    cmd_dist <- fst::read_fst(path = fs::path(version_path,
+                                              "estimations/CMD_dist_stats.fst"), 
+                              as.data.table = TRUE)
+    all_dist_stats <- 
+      rowbind(all_dist_stats, 
+              cmd_dist) 
+    setorder(all_dist_stats, 
+             country_code, 
+             reporting_year)
+    fst::write.fst(all_dist_stats,
+                   path = fs::path(version_path,
+                                   "estimations/lineup_dist_stats.fst"))
+    print("Dist stats fst done")
+  }
+
+
+  
+}
 
 
 # Create refy table unique per country year for pipeline
@@ -74,12 +115,6 @@ fst::write.fst(df_refy,
 fst::write.fst(as.data.frame(lineup_years),
                path = fs::path(version_path,
                                "estimations/lineup_years.fst"))
-
-fst::write.fst(full_dt_dist_stats,
-               path = fs::path(version_path,
-                               "estimations/lineup_dist_stats.fst"))
-
-
 
 
 

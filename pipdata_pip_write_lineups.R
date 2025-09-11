@@ -94,13 +94,75 @@ write_multiple_refy_dist <-
 
 
 
+write_csum_refy <-
+  function(df_refy,
+           cntry_refy,
+           path,
+           gls,
+           dl_aux, 
+           env_acc = NULL) {
+    
+    # ppp year
+    py <- strsplit(gls$vintage_dir, "_")[[1]][2]
+    
+    if (is.null(env_acc)) env_acc <- new.env(parent = .GlobalEnv)
+    
+    lapply(cli::cli_progress_along(cntry_refy,
+                                   total = length(cntry_refy)),
+           FUN = \(i) {
+             
+             x <- cntry_refy[[i]]
+             
+             lapply(x$year,
+                    FUN = \(year         = x$year,
+                            country_code = x$country_code){
+                      
+                      suppressMessages(get_refy_distributions(df_refy    = df_refy,
+                                                              cntry_code = country_code,
+                                                              ref_year   = year,
+                                                              gls        = gls, 
+                                                              py         = py, 
+                                                              env_acc    = env_acc) |>
+                                         get_refy_quantiles(nobs = 2e4) |> 
+                                         get_csum_dist() |> 
+                                         write_ind_csum(path         = path, 
+                                                        country_code = country_code, 
+                                                        ref_year     = year))
+                      
+                    }
+             )
+           })
+    invisible(TRUE)
+  }
 
 
 
 
 
-
-
+#' Function to write cum sum lineup distributions as fst
+#' for country and one reference year
+#'
+#' @param df_refy output from [get_refy_distributions]
+#' @param path path to save the output - "P:\03.pip\lineup_distributions\output-lineup-ref-years"
+#'
+#' @return invisible logical - purpose is to save file
+#' @keywords internal
+write_ind_csum <- function(df_refy,
+                            country_code, 
+                            ref_year, 
+                            path = Sys.getenv("PIP_LINEUPS_DIR")) {
+  
+  # save
+  fst::write_fst(x        = df_refy,
+            path     = fs::path(path,
+                                paste0(country_code,
+                                       "_",
+                                       ref_year,
+                                       ".fst")),
+            compress = 0)
+  
+  invisible(TRUE)
+}
 
 
 

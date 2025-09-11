@@ -8,7 +8,7 @@
 #'
 #' @return data frame:
 #' @export
-get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021) {
+get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021, env_acc = NULL) {
 
   # ensure no factors
   lapply(df_refy,
@@ -131,6 +131,14 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
   attr(df,
        "dt_dist_stats") <- dist_stats$dt_dist
   
+  # Save dist_stats to env_acc if provided
+  if (!is.null(env_acc)) {
+    key <- paste(cntry_code, ref_year, sep = "_")
+    rlang::env_poke(env   = env_acc, 
+                    nm    = key, 
+                    value = dist_stats$dt_dist)
+  }
+  
   # keep attributes of df_refy
   attributes(df) <- c(attributes(df),
                       attributes(df_refy)[-which(names(attributes(df_refy)) %in%
@@ -208,6 +216,45 @@ get_refy_quantiles <- function(df, nobs = 2e4) {
 
 
 
+get_csum_dist <- function(qq) {
+  
+  first_rows <- data.table(reporting_level = funique(qq$reporting_level)) |> 
+    fmutate(welfare = 0, 
+            weight  = 0)
+  qq <- rowbind(qq, 
+                first_rows) |> 
+    setorder(reporting_level, welfare)
+  
+  qq[, `:=`(
+    cw     = weight,
+    cwy    = weight*welfare,
+    cwy2   = weight*welfare*welfare,
+    cwylog = log(pmax(welfare, 1e-10))*weight  # for the watts
+  )]
+  # qq[welfare == 0, cwylog := 0] # No need this with the mp
+  
+  # fix bug
+  g <- GRP(qq, ~ reporting_level, 
+           sort = FALSE # I still don't understand this argument. I think it could
+           # be FALSE because the data is already sorted, but I am not sure. 
+  )
+  
+  csum <-  add_vars(get_vars(qq, 
+                             c("reporting_level", 
+                               "welfare", 
+                               "weight")),
+                    get_vars(qq, 
+                             c("cw", 
+                               "cwy", 
+                               "cwy2", 
+                               "cwylog")) |>
+                      fcumsum(g)) # Here you do fcumsum by reporting_level
+  
+  csum[, index := as.integer(rowid(reporting_level) - 1)]
+  
+  csum
+  
+}
 
 
 
