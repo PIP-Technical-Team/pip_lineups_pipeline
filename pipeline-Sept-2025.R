@@ -9,9 +9,12 @@ ppp <- strsplit(version, "_")[[1]][2] |>
   as.numeric()
 version_path  <- fs::path("E:/PIP/pipapi_data/", 
                           version)
+dir_dist_stats <- 
+  "P:/02.personal/wb612474/pip-technical/pip-lineups-pipeline-objects" |> 
+  fs::path(version)
 use_csum_fst      <- TRUE
 update_dist_stats <- TRUE
-
+big_grp_est       <- FALSE
 
 # load key objects
 source(fs::path("init.R")) # git creds to run create globals function=
@@ -83,10 +86,10 @@ if (use_csum_fst) {
              country_code, 
              reporting_year)
     fst::write.fst(all_dist_stats,
-                   path = fs::path(version_path,
-                                   "estimations/LD_dist_stats.fst"))
-    cmd_dist <- fst::read_fst(path = fs::path(version_path,
-                                              "estimations/CMD_dist_stats.fst"), 
+                   path = fs::path(dir_dist_stats,
+                                   "LD_dist_stats.fst"))
+    cmd_dist <- fst::read_fst(path = fs::path(dir_dist_stats,
+                                              "CMD_dist_stats.fst"), 
                               as.data.table = TRUE)
     all_dist_stats <- 
       rowbind(all_dist_stats, 
@@ -95,8 +98,13 @@ if (use_csum_fst) {
              country_code, 
              reporting_year)
     fst::write.fst(all_dist_stats,
+                   path = fs::path(dir_dist_stats,
+                                   "lineup_dist_stats.fst"))
+    
+    fst::write.fst(all_dist_stats,
                    path = fs::path(version_path,
-                                   "estimations/lineup_dist_stats.fst"))
+                                   "estimations",
+                                   "lineup_dist_stats.fst"))
     print("Dist stats fst done")
   }
 
@@ -118,57 +126,59 @@ fst::write.fst(as.data.frame(lineup_years),
 
 
 
-
-# Create huge data table
-#-------------------------------
-source(fs::path("lineup_distribution_functions.R"))
-df_refy <- fst::read.fst(path = fs::path(version_path, 
-                                         "estimations",
-                                         "prod_ref_estimation.fst")) |> 
-  get_refy_mult_factor()
-t1c <- Sys.time()
-df_all <- get_full_lineup_distribution(df_refy     = df_refy,
-                                       full_list   = full_list[-is_tjk], 
-                                       gls         = gls,
-                                       dl_aux      = dl_aux)
-
-t2c <- Sys.time()
-print(t2c - t1c)
-
-
-setorder(df_all, country_code, reporting_year, reporting_level, welfare)
-t3c <- Sys.time()
-g  <- GRP(df_all,
-          ~ country_code + reporting_year + reporting_level,
-          sort = TRUE)
-
-t4c <- Sys.time()
-df_all <- 
-  df_all |> fselect(welfare, 
-                    weight)
-t5c <- Sys.time()
-write_lineup_files(x        = df_all, 
-                   path     = fs::path(version_path, 
-                                       "lineup_data"), 
-                   obj_name = "full_country_lineups", 
-                   ext      = "fst", 
-                   nthreads = 4)
-t6c <- Sys.time()
-
-write_lineup_files(x        = df_all, 
-                   path     = fs::path(version_path, 
-                                       "lineup_data"), 
-                   obj_name = "full_country_lineups", 
-                   ext      = "qs", 
-                   nthreads = 4)
-t7c <- Sys.time()
-write_lineup_files(x        = g, 
-                   path     = fs::path(version_path, 
-                                       "lineup_data"), 
-                   obj_name = "full_country_lineups_GRP", 
-                   ext      = "qs", 
-                   nthreads = 4)
-t8c <- Sys.time()
-print(t6c - t5c)
-print(t7c - t6c)
-print(t8c - t7c)
+if (big_grp_est) {
+  # Create huge data table
+  #-------------------------------
+  source(fs::path("lineup_distribution_functions.R"))
+  df_refy <- fst::read.fst(path = fs::path(version_path, 
+                                           "estimations",
+                                           "prod_ref_estimation.fst")) |> 
+    get_refy_mult_factor()
+  t1c <- Sys.time()
+  df_all <- get_full_lineup_distribution(df_refy     = df_refy,
+                                         full_list   = full_list, 
+                                         gls         = gls,
+                                         dl_aux      = dl_aux)
+  
+  t2c <- Sys.time()
+  print(t2c - t1c)
+  
+  
+  setorder(df_all, country_code, reporting_year, reporting_level, welfare)
+  t3c <- Sys.time()
+  g  <- GRP(df_all,
+            ~ country_code + reporting_year + reporting_level,
+            sort = TRUE)
+  
+  t4c <- Sys.time()
+  df_all <- 
+    df_all |> fselect(welfare, 
+                      weight)
+  t5c <- Sys.time()
+  write_lineup_files(x        = df_all, 
+                     path     = fs::path(version_path, 
+                                         "lineup_data"), 
+                     obj_name = "full_country_lineups", 
+                     ext      = "fst", 
+                     nthreads = 4)
+  t6c <- Sys.time()
+  
+  write_lineup_files(x        = df_all, 
+                     path     = fs::path(version_path, 
+                                         "lineup_data"), 
+                     obj_name = "full_country_lineups", 
+                     ext      = "qs", 
+                     nthreads = 4)
+  t7c <- Sys.time()
+  write_lineup_files(x        = g, 
+                     path     = fs::path(version_path, 
+                                         "lineup_data"), 
+                     obj_name = "full_country_lineups_GRP", 
+                     ext      = "qs", 
+                     nthreads = 4)
+  t8c <- Sys.time()
+  print(t6c - t5c)
+  print(t7c - t6c)
+  print(t8c - t7c)
+  
+}
