@@ -122,7 +122,9 @@ write_csum_refy <-
                                                               ref_year   = year,
                                                               gls        = gls, 
                                                               py         = py, 
+                                                              dl_aux     = dl_aux,
                                                               env_acc    = env_acc) |>
+                                         
                                          get_refy_quantiles(nobs = 2e4) |> 
                                          get_csum_dist() |> 
                                          write_ind_csum(path         = path, 

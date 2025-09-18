@@ -14,7 +14,9 @@ dir_dist_stats <-
   fs::path(version)
 use_csum_fst      <- TRUE
 update_dist_stats <- TRUE
+update_subset_dist_stats <- TRUE
 big_grp_est       <- FALSE
+adj_arg_pop       <- TRUE
 
 # load key objects
 source(fs::path("init.R")) # git creds to run create globals function=
@@ -41,7 +43,8 @@ lineup_years <- 1981:2025
 
 full_list <-
   get_full_list(lineup_years = lineup_years, 
-                df_refy      = df_refy)
+                df_refy      = df_refy, 
+                only_country = "ARG")
 
 # execute load functions
 #-------------------------------------------
@@ -85,6 +88,26 @@ if (use_csum_fst) {
     setorder(all_dist_stats, 
              country_code, 
              reporting_year)
+    
+    if (update_subset_dist_stats) {
+      ld_dist <- fst::read_fst(path = fs::path(dir_dist_stats,
+                                                "LD_dist_stats.fst"), 
+                                as.data.table = TRUE)
+      ld_dist <-
+        joyn::anti_join(x  = ld_dist, 
+                        y  = all_dist_stats, 
+                        by = c("country_code", 
+                               "reporting_year"), 
+                        reportvar = FALSE)
+      
+      all_dist_stats <- 
+        rowbind(all_dist_stats, 
+                ld_dist)
+      setorder(all_dist_stats, 
+               country_code, 
+               reporting_year)
+    }
+    
     fst::write.fst(all_dist_stats,
                    path = fs::path(dir_dist_stats,
                                    "LD_dist_stats.fst"))
@@ -111,7 +134,9 @@ if (use_csum_fst) {
 
   
 }
-
+# manual_pop_scale_arg(path = fs::path(version_path, 
+#                                      "lineup_data"), 
+#                      dl_aux)
 
 # Create refy table unique per country year for pipeline
 #-------------------------------------------------------

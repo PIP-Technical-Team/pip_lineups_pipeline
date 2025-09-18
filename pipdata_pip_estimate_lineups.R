@@ -8,7 +8,7 @@
 #'
 #' @return data frame:
 #' @export
-get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021, env_acc = NULL) {
+get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021, dl_aux, env_acc = NULL) {
 
   # ensure no factors
   lapply(df_refy,
@@ -105,6 +105,30 @@ get_refy_distributions <- function(df_refy, cntry_code, ref_year, gls, py = 2021
     ) |>
     fungroup() |>
     fmutate(welfare = welfare_ppp * mult_factor)
+  
+  if (cntry_code == "ARG") {
+    
+    # Build a named vector of target populations for this country and year, by level
+    yr_col <- as.character(ref_year)
+    pop_tab <- dl_aux$pop[
+      country_code == cntry_code & data_level == "national"
+    ]
+    if (!yr_col %in% names(pop_tab)) cli::cli_abort("Year ", yr_col, " not found in dl_aux$pop.")
+    pop_by_level <- setNames(as.numeric(pop_tab[[yr_col]]), 
+                             pop_tab[["data_level"]])
+    print("----------------")
+    print(cntry_code)
+    print(ref_year)
+    print(sum(df$weight))
+    # Scale weights so sum(weight) per reporting_level == target population
+    df <- df |>
+      fmutate(
+        .w_sum     = fsum(weight),
+        weight     = weight * (pop_by_level / .w_sum)) |>
+      fselect(-.w_sum)
+
+    print(sum(df$weight))
+  }
 
   # bottom censoring
   if (py == 2021) {

@@ -84,6 +84,71 @@ read_aux_list <- function(path) {
 
 
 
+# 
+# 
+# 
+# manual_pop_scale_arg <- function(path, dl_aux) {
+# 
+#   # files to process
+#   files <- list.files(path, 
+#                       pattern    = "^ARG_\\d{4}\\.fst$", 
+#                       full.names = TRUE)
+#   if (!length(files)) cli::cli_abort("No ARG_YYYY.fst files found in: ", path)
+#   
+#   # build named vector of national population by year
+#   pop_arg <- dl_aux$pop[country_code == "ARG" & 
+#                           data_level == "national"]
+#   if (nrow(pop_arg) != 1L) cli::cli_abort("Pop table must have exactly one 'ARG' + 'national' row.")
+#   year_cols          <- grep("^\\d{4}$", 
+#                              names(pop_arg), 
+#                              value = TRUE)
+#   pop_by_year       <- as.numeric(pop_arg[, ..year_cols])
+#   names(pop_by_year) <- year_cols
+#   
+#   # process files
+#   out <- lapply(files, function(f) {
+#     
+#     year <- sub("^.*_(\\d{4})\\.fst$", 
+#                 "\\1", 
+#                 basename(f))
+#     
+#     pop  <- pop_by_year[[year]]
+#     
+#     if (is.null(pop) || is.na(pop)) {
+#       
+#       cli::cli_abort("No population value for year ", 
+#                      year, " – skipping: ", 
+#                      basename(f))
+#     }
+#     
+#     dt <- fst::read_fst(f, 
+#                         as.data.table = TRUE)
+#     
+#     if (!"weight" %in% names(dt)) {
+#       cli::cli_abort("No 'weight' column in ", basename(f), " – skipping.")
+#     }
+#     
+#     old_sum <- dt$weight |> 
+#       fsum()
+#     
+#     fac <- pop / old_sum
+#     dt[, weight := weight * fac]
+#     fst::write_fst(dt, f)  # overwrite with same name
+#     
+#     invisible(TRUE)
+#     
+#   })
+#   
+#   invisible(TRUE)
+# }
+# 
+
+
+
+
+
+
+
 
 
 # 
