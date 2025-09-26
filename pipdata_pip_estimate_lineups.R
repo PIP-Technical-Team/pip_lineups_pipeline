@@ -215,7 +215,7 @@ get_refy_quantiles <- function(df, nobs = 2e4) {
   
   qx <- lapply(rls, \(rl) {
     x    <- df[reporting_level == rl]
-    xpop <- fsum(df$weight)
+    xpop <- fsum(x$weight)
     
     Qx <- fquantile(x$welfare, 
                     w     = x$weight, 
