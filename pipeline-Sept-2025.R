@@ -27,6 +27,13 @@ df_refy <- fst::read.fst(path = fs::path(version_path,
                                          "estimations",
                                          "prod_ref_estimation.fst")) |> 
   get_refy_mult_factor()
+country_year_welfare_rl <- 
+  df_refy |> 
+  fselect(country_code, 
+          reporting_year, 
+          welfare_type, 
+          reporting_level) |> 
+  funique()
 
 gls <- pipfun::pip_create_globals(vintage = version)
 
@@ -44,7 +51,7 @@ lineup_years <- 1981:2025
 full_list <-
   get_full_list(lineup_years = lineup_years, 
                 df_refy      = df_refy, 
-                only_country = "ARG")
+                only_country = "CHN")
 
 # execute load functions
 #-------------------------------------------
@@ -93,11 +100,18 @@ if (use_csum_fst) {
       ld_dist <- fst::read_fst(path = fs::path(dir_dist_stats,
                                                 "LD_dist_stats.fst"), 
                                 as.data.table = TRUE)
+      print(ld_dist$country_code |> funique())
+      print("-----------------------")
+      print(all_dist_stats$country_code |> funique())
       ld_dist <-
         joyn::anti_join(x  = ld_dist, 
                         y  = all_dist_stats, 
                         by = c("country_code", 
                                "reporting_year"), 
+                        reportvar = FALSE)
+      all_dist_stats <- 
+        all_dist_stats |> 
+        joyn::left_join(y = country_year_welfare_rl, 
                         reportvar = FALSE)
       
       all_dist_stats <- 
@@ -106,8 +120,24 @@ if (use_csum_fst) {
       setorder(all_dist_stats, 
                country_code, 
                reporting_year)
+      
+      print("-----------------------")
+      print(all_dist_stats$country_code |> funique())
+    } else {
+      
     }
+    # all_dist_stats <- fst::read.fst(
+    #                path = fs::path(dir_dist_stats,
+    #                                "LD_dist_stats.fst"))
     
+    if (!"welfare_type" %in% names(all_dist_stats)) {
+      all_dist_stats <- 
+        all_dist_stats |> 
+        joyn::left_join(y = country_year_welfare_rl, 
+                        reportvar = FALSE)
+      print("Yes: line 138")
+    }
+      
     fst::write.fst(all_dist_stats,
                    path = fs::path(dir_dist_stats,
                                    "LD_dist_stats.fst"))
