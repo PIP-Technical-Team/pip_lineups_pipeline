@@ -52,10 +52,18 @@ read_aux_list <- function(path) {
     pattern    = "\\.qs$",
     full.names = TRUE
   )
+  for (f in qs_files) {
+    result <- tryCatch(
+      { qs::qread(f); "OK" },
+      error = function(e) paste("FAIL:", e$message)
+    )
+    if (result != "OK") cat(basename(f), "-->", result, "\n")
+  }
   
   qs_names <- tools::file_path_sans_ext(basename(qs_files))
-  dl_aux <- lapply(qs_files, qs::qread)
-  names(dl_aux) <- qs_names
+  #print(qs_files)
+  #dl_aux <- lapply(qs_files, qs::qread)
+  #names(dl_aux) <- qs_names
   
   # Read .fst files that are not already loaded via .qs
   fst_files <- list.files(
@@ -67,15 +75,16 @@ read_aux_list <- function(path) {
   fst_names <- tools::file_path_sans_ext(basename(fst_files))
   
   # Filter .fst files whose base names are not in qs_names
-  keep_idx <- !(fst_names %in% qs_names)
-  fst_files_to_read <- fst_files[keep_idx]
-  fst_names_to_add  <- fst_names[keep_idx]
+  #keep_idx <- !(fst_names %in% qs_names)
+  
+  fst_files_to_read <- fst_files#[keep_idx]
+  fst_names_to_add  <- fst_names#[keep_idx]
   
   # Read remaining .fst files and add to dl_aux
   if (length(fst_files_to_read) > 0) {
     fst_data <- lapply(fst_files_to_read, fst::read_fst, as.data.table = TRUE)
     names(fst_data) <- fst_names_to_add
-    dl_aux <- c(dl_aux, fst_data)
+    dl_aux <- fst_data #c(dl_aux, fst_data)
   }
   
   dl_aux
