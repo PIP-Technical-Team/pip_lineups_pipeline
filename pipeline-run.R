@@ -4,7 +4,7 @@ library(qs)
 library(joyn)
 
 # Set key arguments
-version       <- "20250930_2021_01_02_PROD"
+version       <- "20260324_2021_01_02_PROD"
 ppp <- strsplit(version, "_")[[1]][2] |>
   as.numeric()
 version_path  <- fs::path("E:/PIP/pipapi_data/", 
@@ -16,7 +16,6 @@ use_csum_fst      <- TRUE
 update_dist_stats <- TRUE
 update_subset_dist_stats <- TRUE
 big_grp_est       <- FALSE
-adj_arg_pop       <- TRUE
 
 # load key objects
 source(fs::path("init.R")) # git creds to run create globals function=
@@ -39,7 +38,7 @@ gls <- pipfun::pip_create_globals(vintage = version)
 
 # Get all .qs files
 dl_aux <- read_aux_list(path = version_path)
-max_lineup_year <- 
+smax_lineup_year <- 
   dl_aux$metaregion |> 
   fsubset(region_code == "WLD") |> 
   fselect(lineup_year) |> 
@@ -50,8 +49,7 @@ lineup_years <- 1981:2025
 
 full_list <-
   get_full_list(lineup_years = lineup_years, 
-                df_refy      = df_refy, 
-                only_country = "CHN")
+                df_refy      = df_refy)
 
 # execute load functions
 #-------------------------------------------
@@ -100,9 +98,9 @@ if (use_csum_fst) {
       ld_dist <- fst::read_fst(path = fs::path(dir_dist_stats,
                                                 "LD_dist_stats.fst"), 
                                 as.data.table = TRUE)
-      print(ld_dist$country_code |> funique())
-      print("-----------------------")
-      print(all_dist_stats$country_code |> funique())
+      #print(ld_dist$country_code |> funique())
+      #print("-----------------------")
+      #print(all_dist_stats$country_code |> funique())
       ld_dist <-
         joyn::anti_join(x  = ld_dist, 
                         y  = all_dist_stats, 
@@ -121,8 +119,8 @@ if (use_csum_fst) {
                country_code, 
                reporting_year)
       
-      print("-----------------------")
-      print(all_dist_stats$country_code |> funique())
+      #print("-----------------------")
+      #print(all_dist_stats$country_code |> funique())
     } else {
       
     }
